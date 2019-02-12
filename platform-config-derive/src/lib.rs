@@ -117,7 +117,10 @@ fn analyze_field<'a>(field: &'a Field) -> FieldInfo<'a> {
         let path = &attr.path;
 
         if quote!(#path) != quote!(platformconfig) {
-            continue; // ignore attributes other than platformconfig
+            // Forward non-platformconfig attributes unmodified
+            // (e.g. doc comments used to auto-generate help)
+            result.structopt_attrs.push(attr.clone());
+            continue;
         }
 
         let meta = attr.interpret_meta();
