@@ -48,7 +48,7 @@ struct FieldInfo<'a> {
     pub structopt_attrs: Vec<Attribute>,
     pub is_optional: bool,
     pub is_optional_cmd: bool,
-    pub is_cmd_arg: bool
+    pub is_cmd_arg: bool,
 }
 
 impl<'a> FieldInfo<'a> {
@@ -58,7 +58,7 @@ impl<'a> FieldInfo<'a> {
             structopt_attrs: Vec::new(),
             is_optional: false,
             is_optional_cmd: false,
-            is_cmd_arg: true
+            is_cmd_arg: true,
         }
     }
 
