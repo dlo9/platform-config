@@ -13,7 +13,7 @@ use syn::token::{Comma};
 use structopt::*;
 use structopt_derive::*;
 
-#[proc_macro_derive(PlatformConfig, attributes(platformconfig))]
+#[proc_macro_derive(PlatformConfig, attributes(platformconfig, structopt))]
 pub fn platformconfig(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
@@ -201,15 +201,7 @@ fn gen_structopt_struct(name: &Ident, field_infos: &[FieldInfo], attrs: &[Attrib
 
     let attrs = attrs
         .iter()
-        .map(|attr| {
-             let path = &attr.path;
-             if quote!(#path) == quote!(platformconfig) {
-                 Attribute { path: "structopt".into(), ..attr.clone() }
-             } else {
-                 attr.clone()
-             }
-        })
-        .collect::<Vec<_>>();
+        .filter(|attr| quote!(&attr.path) != quote!(platformconfig));
 
     quote! {
         #[derive(StructOpt)]
