@@ -26,7 +26,7 @@ fn impl_platformconfig(input: &DeriveInput) -> quote::Tokens {
     let struct_name = &input.ident;
     let inner_impl = match input.data {
         Struct(DataStruct { fields: syn::Fields::Named(ref fields), .. }) =>
-            impl_platformconfig_for_struct(struct_name, &fields.named),
+            impl_platformconfig_for_struct(struct_name, &fields.named, &input.attrs),
         _ => panic!("platformconfig only supports non-tuple structs")
     };
 
@@ -189,15 +189,28 @@ fn impl_platformconfig_trait(name: &Ident, field_infos: &[FieldInfo]) -> quote::
     }
 }
 
-fn gen_structopt_struct(name: &Ident, field_infos: &[FieldInfo]) -> quote::Tokens {
+fn gen_structopt_struct(name: &Ident, field_infos: &[FieldInfo], attrs: &[Attribute]) -> quote::Tokens {
     let name = Ident::from(format!("PlatformConfig{}StructOpt", name));
     let fields = field_infos
         .iter()
         .filter_map(|fi| fi.structopt_field())
         .collect::<Vec<quote::Tokens>>();
 
+    let attrs = attrs
+        .iter()
+        .map(|attr| {
+             let path = &attr.path;
+             if quote!(#path) == quote!(platformconfig) {
+                 Attribute { path: "structopt".into(), ..attr.clone() }
+             } else {
+                 attr.clone()
+             }
+        })
+        .collect::<Vec<_>>();
+
     quote! {
         #[derive(StructOpt)]
+        #(#attrs)*
         struct #name {
             #(#fields),*
         }
@@ -206,7 +219,8 @@ fn gen_structopt_struct(name: &Ident, field_infos: &[FieldInfo]) -> quote::Token
 
 fn impl_platformconfig_for_struct(
     name: &Ident,
-    fields: &Punctuated<Field, Comma>
+    fields: &Punctuated<Field, Comma>,
+    attrs: &[Attribute]
 ) -> quote::Tokens {
     let field_infos = fields
         .iter()
@@ -214,7 +228,7 @@ fn impl_platformconfig_for_struct(
         .collect::<Vec<_>>();
 
     let platformconfig_trait_impl = impl_platformconfig_trait(name, &field_infos);
-    let structopt = gen_structopt_struct(name, &field_infos);
+    let structopt = gen_structopt_struct(name, &field_infos, attrs);
 
     quote! {
         #platformconfig_trait_impl
