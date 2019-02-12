@@ -43,12 +43,21 @@ fn is_option(ty: &Type) -> bool {
     }
 }
 
+fn is_flag(ty: &Type) -> bool {
+    if let syn::Type::Path(TypePath { path: syn::Path { ref segments, .. }, .. }) = *ty {
+        segments.iter().last().unwrap().ident.as_ref() == "bool"
+    } else {
+        false
+    }
+}
+
 struct FieldInfo<'a> {
     pub field: &'a Field,
     pub structopt_attrs: Vec<Attribute>,
     pub is_optional: bool,
     pub is_optional_cmd: bool,
     pub is_cmd_arg: bool,
+    pub is_flag: bool,
 }
 
 impl<'a> FieldInfo<'a> {
@@ -59,6 +68,7 @@ impl<'a> FieldInfo<'a> {
             is_optional: false,
             is_optional_cmd: false,
             is_cmd_arg: true,
+            is_flag: false,
         }
     }
 
@@ -100,6 +110,7 @@ fn analyze_field<'a>(field: &'a Field) -> FieldInfo<'a> {
     let mut result = FieldInfo::new(field);
 
     result.is_optional = is_option(&field.ty);
+    result.is_flag = is_flag(&field.ty);
     result.is_optional_cmd = result.is_optional;
 
     for attr in field.attrs.iter() {
@@ -150,12 +161,13 @@ fn impl_platformconfig_trait(name: &Ident, field_infos: &[FieldInfo]) -> quote::
             let ident = fi.field.ident;
             let ident_str = syn::Lit::Str(LitStr::new(&ident.unwrap().to_string(), Span::call_site()));
 
-            match (fi.is_cmd_arg, fi.is_optional_cmd, fi.is_optional) {
-                (true, true, true)   => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident } else { config.get(#ident_str).ok() } },
-                (true, true, false)  => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident.unwrap() } else { config.get(#ident_str).unwrap() } },
-                (true, false, _)     => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident } else { config.get(#ident_str).unwrap() } },
-                (false, _, true)     => quote! { #ident: config.get(#ident_str).ok() },
-                (false, _, false)    => quote! { #ident: config.get(#ident_str).unwrap() }
+            match (fi.is_cmd_arg, fi.is_optional_cmd, fi.is_optional, fi.is_flag) {
+                (_, _, _, true)         => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident } else { config.get(#ident_str).unwrap_or_default() } },
+                (true, true, true, _)   => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident } else { config.get(#ident_str).ok() } },
+                (true, true, false, _)  => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident.unwrap() } else { config.get(#ident_str).unwrap() } },
+                (true, false, _, _)     => quote! { #ident: if matches.is_present(#ident_str) { opts.#ident } else { config.get(#ident_str).unwrap() } },
+                (false, _, true, _)     => quote! { #ident: config.get(#ident_str).ok() },
+                (false, _, false, _)    => quote! { #ident: config.get(#ident_str).unwrap() }
             }
         });
 
